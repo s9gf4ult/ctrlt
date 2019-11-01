@@ -17,8 +17,10 @@ extra-source-files:  CHANGELOG.md
 
 library
   build-depends:       base ^>=4.12.0.0
+                     , exceptions
                      , mtl
                      , transformers
+                     , transformers-base
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: DataKinds
@@ -43,3 +45,4 @@ library
                     , UnboxedTuples
                     , UndecidableInstances
   exposed-modules: Control.Monad.CtrlT
+                 , Control.Monad.CtrlT.Class
