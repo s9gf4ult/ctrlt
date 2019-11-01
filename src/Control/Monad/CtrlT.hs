@@ -45,3 +45,11 @@ ctrlMask
   -> CtrlT t r m b
 ctrlMask ma = lift $ mask $ \restore ->
   evalCtrlT (ma $ lift . restore . evalCtrlT)
+
+ctrlUninterruptibleMask
+  :: forall r m t b
+  .  (MonadMask m)
+  => (forall s. (forall a q . CtrlT q a m a -> CtrlT s b m a) -> CtrlT s b m b)
+  -> CtrlT t r m b
+ctrlUninterruptibleMask ma = lift $ uninterruptibleMask $ \restore ->
+  evalCtrlT (ma $ lift . restore . evalCtrlT)
