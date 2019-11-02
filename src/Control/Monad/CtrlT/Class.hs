@@ -15,3 +15,7 @@ class IndexedMonadMask m (c :: k -> * -> (* -> *) -> * -> *) where
     :: forall r t b
     .  (forall s. (forall a q . c q a m a -> c s b m a) -> c s b m b)
     -> c t r m b
+  indUninterruptibleMask
+    :: forall r t b
+    .  (forall s. (forall a q . c q a m a -> c s b m a) -> c s b m b)
+    -> c t r m b
