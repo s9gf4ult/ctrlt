@@ -226,31 +226,34 @@ newline: native
 # No language extensions are enabled by default.
 language_extensions:
   - Arrows
+  - ConstraintKinds
   - DataKinds
   - DeriveFunctor
   - DeriveGeneric
   - DuplicateRecordFields
   - FlexibleContexts
   - FlexibleInstances
+  - FunctionalDependencies
   - GADTs
   - GeneralizedNewtypeDeriving
+  - KindSignatures
   - LambdaCase
+  - LambdaCase
+  - MagicHash
   - MultiParamTypeClasses
+  - MultiWayIf
   - OverloadedStrings
+  - PartialTypeSignatures
+  - PolyKinds
+  - QuantifiedConstraints
   - QuasiQuotes
   - RankNTypes
+  - RoleAnnotations
+  - ScopedTypeVariables
   - StandaloneDeriving
   - TemplateHaskell
-  - TypeApplications
-  - ConstraintKinds
-  - PartialTypeSignatures
-  - ScopedTypeVariables
   - TupleSections
-  - KindSignatures
-  - FunctionalDependencies
-  - QuantifiedConstraints
-  - PolyKinds
-  - MagicHash
-  - MultiWayIf
+  - TypeApplications
   - TypeSynonymInstances
   - UnboxedTuples
+  - UndecidableInstances

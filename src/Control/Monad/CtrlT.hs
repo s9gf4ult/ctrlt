@@ -1,12 +1,13 @@
 module Control.Monad.CtrlT where
 
-import Control.Monad.Base
-import Data.Coerce
-import Control.Monad.Catch
-import Control.Monad.Cont
-import Control.Monad.CtrlT.Class
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Cont
+import           Control.Monad.Base
+import           Control.Monad.Catch
+import           Control.Monad.Cont
+import           Control.Monad.CtrlT.Class
+import           Control.Monad.Trans.Class
+import           Control.Monad.Trans.Cont
+import           Data.Coerce
+import           Data.Functor.Identity
 
 type role CtrlT nominal nominal representational representational
 
@@ -24,40 +25,35 @@ instance (MonadThrow m) => MonadThrow (CtrlT s r m) where
   throwM = lift . throwM
   {-# INLINE throwM #-}
 
-instance (MonadCatch m) => IndexedMonadCatch m CtrlT where
-  indCatch = ctrlCatch
+instance (MonadCatch m) => IndexedMonadCatch CtrlT m Identity where
+  indexedCatch = ctrlCatch
 
-instance (MonadMask m) => IndexedMonadMask m CtrlT where
-  indMask = ctrlMask
-  indUninterruptibleMask = ctrlUninterruptibleMask
+instance (MonadMask m) => IndexedMonadMask CtrlT m Identity where
+  indexedLiftMask = ctrlLiftMask
 
 evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
-evalCtrlT (CtrlT cont) = evalContT cont
+evalCtrlT = runCtrlT return
+
+runCtrlT :: (Monad m) => (a -> m r) -> CtrlT s r m a -> m r
+runCtrlT ret (CtrlT cont) = runContT cont ret
 
 ctrlCatch
   :: forall m e t r a
   .  (MonadCatch m, Exception e)
-  => (forall s. CtrlT s a m a)
-  -> (forall q. e -> CtrlT q a m a)
+  => (forall s. CtrlT s (Identity a) m a)
+  -> (forall q. e -> CtrlT q (Identity a) m a)
   -> CtrlT t r m a
 ctrlCatch ma handler = lift
-  $ catch (evalCtrlT ma) (evalCtrlT . handler)
+  $ fmap runIdentity $ catch (runCtrlT (return . Identity) ma) (runCtrlT (return . Identity) . handler)
 
-ctrlMask
+ctrlLiftMask
   :: forall r m t b
-  .  (MonadMask m)
-  => (forall s. (forall a q . CtrlT q a m a -> CtrlT s b m a) -> CtrlT s b m b)
+  .  (Monad m)
+  => (forall d. ((forall a. m a -> m a) -> m d) -> m d)
+  -> (forall s. (forall a q . CtrlT q (Identity a) m a -> CtrlT s (Identity b) m a) -> CtrlT s (Identity b) m b)
   -> CtrlT t r m b
-ctrlMask ma = lift $ mask $ \restore ->
-  evalCtrlT (ma $ lift . restore . evalCtrlT)
-
-ctrlUninterruptibleMask
-  :: forall r m t b
-  .  (MonadMask m)
-  => (forall s. (forall a q . CtrlT q a m a -> CtrlT s b m a) -> CtrlT s b m b)
-  -> CtrlT t r m b
-ctrlUninterruptibleMask ma = lift $ uninterruptibleMask $ \restore ->
-  evalCtrlT (ma $ lift . restore . evalCtrlT)
+ctrlLiftMask mMask ma = lift $ fmap runIdentity $ mMask $ \restore ->
+  runCtrlT (return . Identity) (ma $ lift . fmap runIdentity . restore . runCtrlT (return . Identity))
 
 forallCC
   :: ((forall b. a -> ContT r m b) -> ContT r m a)

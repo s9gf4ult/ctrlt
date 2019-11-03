@@ -21,22 +21,6 @@ library
                      , mtl
                      , transformers
                      , transformers-base
-
-                     , bytestring
-                     , comonad
-                     , containers
-                     , exceptions
-                     , generic-lens
-                     , hashable
-                     , lens
-                     , monad-control
-                     , mtl
-                     , repa
-                     , text
-                     , transformers
-                     , transformers-base
-                     , unordered-containers
-
   hs-source-dirs:      src
   default-language:    Haskell2010
   default-extensions: DataKinds
@@ -46,6 +30,8 @@ library
                     , FlexibleInstances
                     , GeneralizedNewtypeDeriving
                     , KindSignatures
+                    , LambdaCase
+                    , FunctionalDependencies
                     , MagicHash
                     , MultiParamTypeClasses
                     , MultiWayIf

@@ -1,21 +1,20 @@
 module Control.Monad.CtrlT.Class where
 
-import Control.Exception
+import           Control.Exception
 
-class IndexedMonadCatch m (c :: k -> * -> (* -> *) -> * -> *) where
-  indCatch
+class IndexedMonadCatch (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) (w :: * -> *) where
+  indexedCatch
     :: forall e t r a
     .  (Exception e)
-    => (forall s. c s a m a)
-    -> (forall q. e -> c q a m a)
+    => (forall s. c s (w a) m a)
+    -> (forall q. e -> c q (w a) m a)
     -> c t r m a
 
-class IndexedMonadMask m (c :: k -> * -> (* -> *) -> * -> *) where
-  indMask
+class IndexedMonadMask (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) (w :: * -> *)
+  | c -> w where
+  indexedLiftMask
     :: forall r t b
-    .  (forall s. (forall a q . c q a m a -> c s b m a) -> c s b m b)
-    -> c t r m b
-  indUninterruptibleMask
-    :: forall r t b
-    .  (forall s. (forall a q . c q a m a -> c s b m a) -> c s b m b)
+    .  (forall d. ((forall a. m a -> m a) -> m d) -> m d)
+    -- ^ The 'mask' function from inner monad
+    -> (forall s. (forall a q . c q (w a) m a -> c s (w b) m a) -> c s (w b) m b)
     -> c t r m b
