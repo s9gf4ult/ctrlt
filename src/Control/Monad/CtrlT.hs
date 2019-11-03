@@ -13,9 +13,7 @@ type role CtrlT nominal nominal representational representational
 
 newtype CtrlT (s :: k) (r :: *) (m :: * -> *) (a :: *) = CtrlT
   { peelCtrlT :: ContT r m a
-  } deriving (Functor, Applicative, Monad, MonadTrans)
-
-deriving instance MonadCont (CtrlT s r m)
+  } deriving (Functor, Applicative, Monad, MonadTrans, MonadCont)
 
 instance (MonadBase b m) => MonadBase b (CtrlT s r m) where
   liftBase = lift . liftBase

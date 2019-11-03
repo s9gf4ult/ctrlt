@@ -49,11 +49,18 @@ instance MonadTrans (EscT e s r) where
   lift ma = EscT $ \_esc -> lift ma
   {-# INLINE lift #-}
 
+instance MonadCont (EscT e s r m) where
+  callCC f = EscT $ \esc -> callCC $ \cc ->
+    peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
+  {-# INLINE callCC #-}
+
 instance (MonadCatch m) => IndexedMonadCatch (EscT e) m (Either e) where
   indexedCatch = escCatch
+  {-# INLINE indexedCatch #-}
 
 instance (Monad m) => IndexedMonadMask (EscT e) m (Either e) where
   indexedLiftMask = escLiftMask
+  {-# INLINE indexedLiftMask #-}
 
 escCatch
   :: forall x m e t r a

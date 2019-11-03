@@ -48,4 +48,5 @@ library
                     , UndecidableInstances
   exposed-modules: Control.Monad.CtrlT
                  , Control.Monad.CtrlT.Class
+                 , Control.Monad.SpaceT
                  , Control.Monad.EscT
