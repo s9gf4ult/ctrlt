@@ -18,3 +18,8 @@ class IndexedMonadMask (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) (f :: *
     -- ^ The 'mask' function from inner monad
     -> (forall s. (forall a q . c q (f a) m a -> c s (f b) m a) -> c s (f b) m b)
     -> c t r m b
+
+class Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) where
+  type Dust c a :: *
+  burnout :: (forall s. c s (Dust c a) m a) -> m (Dust c a)
+  reborn  :: Dust c a -> c s r m a

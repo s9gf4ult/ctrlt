@@ -29,6 +29,11 @@ instance (MonadCatch m) => IndexedMonadCatch CtrlT m Identity where
 instance (MonadMask m) => IndexedMonadMask CtrlT m Identity where
   indexedLiftMask = ctrlLiftMask
 
+instance (Monad m) => Phoenix CtrlT m where
+  type Dust CtrlT a = a
+  burnout = evalCtrlT
+  reborn = return
+
 evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
 evalCtrlT = runCtrlT return
 

@@ -236,6 +236,7 @@ language_extensions:
   - FunctionalDependencies
   - GADTs
   - GeneralizedNewtypeDeriving
+  - TypeFamilies
   - KindSignatures
   - LambdaCase
   - LambdaCase

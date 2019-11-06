@@ -29,3 +29,7 @@ instance (MonadTrans (t s r)) => MonadTrans (SpaceT t d s r) where
 instance (IndexedMonadCatch t m f) => IndexedMonadCatch (SpaceT t d) m f
 
 instance (IndexedMonadMask t m f) => IndexedMonadMask (SpaceT t d) m f
+
+instance (Phoenix t m) => Phoenix (SpaceT t d) m where
+  Dust (SpaceT t d) a = Dust t a
+  burnout =

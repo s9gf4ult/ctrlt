@@ -62,6 +62,11 @@ instance (Monad m) => IndexedMonadMask (EscT e) m (Either e) where
   indexedLiftMask = escLiftMask
   {-# INLINE indexedLiftMask #-}
 
+instance (Monad m) => Phoenix (EscT e) m where
+  type Dust (EscT e) a = Either e a
+  burnout = evalEscT
+  reborn = eitherEscape
+
 escCatch
   :: forall x m e t r a
   .  (MonadCatch m, Exception e)
