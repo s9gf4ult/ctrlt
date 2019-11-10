@@ -43,3 +43,4 @@ indexedUninterruptibleMask
   -> c t r m b
 indexedUninterruptibleMask ma = burnWith $ \flame -> uninterruptibleMask $ \restore ->
   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
+{-# INLINE indexedUninterruptibleMask #-}
