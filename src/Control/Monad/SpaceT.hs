@@ -3,8 +3,8 @@ module Control.Monad.SpaceT where
 import           Control.Monad.CtrlT.Class
 import           Control.Monad.Trans.Class
 
-newtype SpaceT t (d :: (* -> *) -> *)  (s :: k) (r :: *) (m :: * -> *) (a :: *) = SpaceT
-  { peelSpaceT :: d (SpaceT t d s r m) -> t s r m a
+newtype SpaceT t (d :: *) (s :: k) (r :: *) (m :: * -> *) (a :: *) = SpaceT
+  { peelSpaceT :: d -> t s r m a
   } deriving Functor
 
 instance (Applicative (t s r m)) => Applicative (SpaceT t d s r m) where
@@ -26,10 +26,8 @@ instance (MonadTrans (t s r)) => MonadTrans (SpaceT t d s r) where
   lift ma = SpaceT $ \_d -> lift ma
   {-# INLINE lift #-}
 
-instance (IndexedMonadCatch t m f) => IndexedMonadCatch (SpaceT t d) m f
-
-instance (IndexedMonadMask t m f) => IndexedMonadMask (SpaceT t d) m f
-
 instance (Phoenix t m) => Phoenix (SpaceT t d) m where
-  Dust (SpaceT t d) a = Dust t a
-  burnout =
+  type Dust (SpaceT t d) a = Dust t a
+  burnWith ma = SpaceT $ \d -> burnWith $ \flame ->
+    ma (\spaceT -> flame $ peelSpaceT spaceT d)
+  reborn md = SpaceT $ \_d -> reborn md

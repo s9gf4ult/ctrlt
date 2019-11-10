@@ -54,18 +54,18 @@ instance MonadCont (EscT e s r m) where
     peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
   {-# INLINE callCC #-}
 
-instance (MonadCatch m) => IndexedMonadCatch (EscT e) m (Either e) where
-  indexedCatch = escCatch
-  {-# INLINE indexedCatch #-}
+-- instance (MonadCatch m) => IndexedMonadCatch (EscT e) m (Either e) where
+--   indexedCatch = escCatch
+--   {-# INLINE indexedCatch #-}
 
-instance (Monad m) => IndexedMonadMask (EscT e) m (Either e) where
-  indexedLiftMask = escLiftMask
-  {-# INLINE indexedLiftMask #-}
+-- instance (Monad m) => IndexedMonadMask (EscT e) m (Either e) where
+--   indexedLiftMask = escLiftMask
+--   {-# INLINE indexedLiftMask #-}
 
 instance (Monad m) => Phoenix (EscT e) m where
   type Dust (EscT e) a = Either e a
-  burnout = evalEscT
-  reborn = eitherEscape
+  burnWith ma = reborn $ ma evalEscT
+  reborn me = lift me >>= eitherEscape
 
 escCatch
   :: forall x m e t r a

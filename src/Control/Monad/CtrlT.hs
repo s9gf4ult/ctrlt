@@ -23,16 +23,10 @@ instance (MonadThrow m) => MonadThrow (CtrlT s r m) where
   throwM = lift . throwM
   {-# INLINE throwM #-}
 
-instance (MonadCatch m) => IndexedMonadCatch CtrlT m Identity where
-  indexedCatch = ctrlCatch
-
-instance (MonadMask m) => IndexedMonadMask CtrlT m Identity where
-  indexedLiftMask = ctrlLiftMask
-
 instance (Monad m) => Phoenix CtrlT m where
   type Dust CtrlT a = a
-  burnout = evalCtrlT
-  reborn = return
+  burnWith ma = lift $ ma evalCtrlT
+  reborn = lift
 
 evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
 evalCtrlT = runCtrlT return
