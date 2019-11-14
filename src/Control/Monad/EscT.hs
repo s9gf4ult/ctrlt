@@ -4,6 +4,7 @@ import           Control.Monad.Catch
 import           Control.Monad.Cont
 import           Control.Monad.CtrlT
 import           Control.Monad.CtrlT.Class
+import           Control.Monad.Except
 import           Control.Monad.Reader
 
 newtype EscT (e :: *) (s :: k) (r :: *) (m :: * -> *) (a :: *) = EscT
@@ -25,6 +26,12 @@ eitherEscape :: Either e a -> EscT e s r m a
 eitherEscape = \case
   Left e -> escape e
   Right a -> return a
+
+mapEscape :: (a -> b) -> EscT a s r m x -> EscT b s r m x
+mapEscape f ma = EscT $ \esc -> do
+  runEscT ma >>= \case
+    Right x -> return x
+    Left a  -> esc (f a)
 
 instance Functor (EscT e s r m) where
   fmap f (EscT a) = EscT $ \esc -> fmap f (a esc)
@@ -54,18 +61,20 @@ instance MonadCont (EscT e s r m) where
     peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
   {-# INLINE callCC #-}
 
--- instance (MonadCatch m) => IndexedMonadCatch (EscT e) m (Either e) where
---   indexedCatch = escCatch
---   {-# INLINE indexedCatch #-}
-
--- instance (Monad m) => IndexedMonadMask (EscT e) m (Either e) where
---   indexedLiftMask = escLiftMask
---   {-# INLINE indexedLiftMask #-}
-
 instance (Monad m) => Phoenix (EscT e) m where
   type Dust (EscT e) a = Either e a
   burnWith ma = reborn $ ma evalEscT
   reborn me = lift me >>= eitherEscape
+
+instance MonadError e (EscT e s r m) where
+  throwError = escape
+  catchError ma handler = EscT $ \esc -> do
+    runEscT ma >>= \case
+      Right a -> return a
+      Left e -> do
+        runEscT (handler e) >>= \case
+          Right a -> return a
+          Left  e -> esc e
 
 escCatch
   :: forall x m e t r a
