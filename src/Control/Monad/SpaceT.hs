@@ -1,4 +1,7 @@
-module Control.Monad.SpaceT where
+module Control.Monad.SpaceT
+  ( SpaceT(peelSpaceT)
+  , evalSpaceT
+  ) where
 
 import           Control.Monad.Catch
 import           Control.Monad.Cont

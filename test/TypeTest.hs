@@ -10,46 +10,64 @@ import           Control.Monad.CtrlT.Class
 import           Control.Monad.EscT
 import           Control.Monad.SpaceT
 import           Data.Coerce
+import           GHC.Stack
 import           Test.ShouldNotTypecheck
 import           Test.Tasty
 import           Test.Tasty.HUnit
 
-test_CallCC_Escape_Not_Allowed :: TestTree
-test_CallCC_Escape_Not_Allowed = testGroup "CallCC escape not allowed"
-  [ testCase "CtrlT" (noEscapeCC evalCtrlT)
-  , testCase "EscT" (noEscapeCC $ fmap (either id id) . evalEscT)
-  , testCase "SpaceT" (noEscapeCC $ evalCtrlT . evalSpaceT ())
+test_No_CC :: HasCallStack => TestTree
+test_No_CC = testGroup "CallCC escape not allowed"
+  [ testCase "CtrlT" $ do
+      res <- try $ evalCtrlT $ do
+        callCC $ \esc -> do
+          indexedCatchAll (esc 1 *> return 2) throwM
+                     -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException) -> throw e
+        Right (a :: Int)          -> a
+  , testCase "EscT" $ do
+      res <- try $ evalEscT $ do
+        callCC $ \esc -> do
+          indexedCatchAll (esc 1 *> return 2) throwM
+                     -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException)   -> throw e
+        Right (a :: Either Int Int) -> a
+  , testCase "SpaceT" $ do
+      res <- try $ evalCtrlT $ evalSpaceT () $ do
+        callCC $ \esc -> do
+          indexedCatchAll (esc 1 *> return 2) throwM
+                     -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException) -> throw e
+        Right (a :: Int)          -> a
   ]
 
-test_No_Coerce :: TestTree
+
+test_No_Coerce :: HasCallStack => TestTree
 test_No_Coerce = testGroup "CallCC escape not coercible"
-  [ testCase "CtrlT" (noCoerceCC evalCtrlT)
-  , testCase "EscT" (noCoerceCC $ fmap (either id id) . evalEscT)
-  , testCase "SpaceT" (noCoerceCC $ evalCtrlT . evalSpaceT ())
+  [ testCase "CtrlT" $ do
+      res <- try $ evalCtrlT $ do
+        callCC $ \esc -> do
+          indexedCatchAll (coerce (esc 1) *> return 2) throwM
+                              -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException) -> throw e
+        Right (a :: Int)          -> a
+  , testCase "EscT" $ do
+      res <- try $ evalEscT $ do
+        callCC $ \esc -> do
+          indexedCatchAll (coerce (esc 1) *> return 2) throwM
+                              -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException)   -> throw e
+        Right (a :: Either Int Int) -> a
+  , testCase "SpaceT" $ do
+      res <- try $ evalCtrlT $ evalSpaceT () $ do
+        callCC $ \esc -> do
+          indexedCatchAll (coerce (esc 1) *> return 2) throwM
+                              -- Rethrowing type error ^^^
+      shouldNotTypecheck $ case res of
+        Left (e :: SomeException) -> throw e
+        Right (a :: Int)          -> a
   ]
-
-noEscapeCC
-  :: (Phoenix c IO, MonadContC c IO, MonadThrowC c IO)
-  => Eval c IO Int
-  -> Assertion
-noEscapeCC evalC = do
-  res <- try $ evalC $ do
-    callCC $ \esc -> do
-      indexedCatchAll (esc 1 *> return 2) throwM
-                 -- Rethrowing type error ^^^
-  shouldNotTypecheck $ case res of
-    Left (e :: SomeException) -> throw e
-    Right a                   -> a
-
-noCoerceCC
-  :: (Phoenix c IO, MonadContC c IO, MonadThrowC c IO)
-  => Eval c IO Int
-  -> Assertion
-noCoerceCC evalC = do
-  res <- try $ evalC $ do
-    callCC $ \esc -> do
-      indexedCatchAll (coerce (esc 1) *> return 2) throwM
-                 -- Rethrowing type error ^^^
-  shouldNotTypecheck $ case res of
-    Left (e :: SomeException) -> throw e
-    Right a                   -> a

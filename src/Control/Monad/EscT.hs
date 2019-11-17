@@ -1,4 +1,11 @@
-module Control.Monad.EscT where
+module Control.Monad.EscT
+  (EscT(peelEscT)
+  , evalEscT
+  , runEscT
+  , escape
+  , eitherEscape
+  , mapEscape
+  ) where
 
 import           Control.Monad.Catch
 import           Control.Monad.Cont
@@ -79,54 +86,3 @@ instance MonadError e (EscT e s r m) where
         runEscT (handler e) >>= \case
           Right a -> return a
           Left  e -> esc e
-
-escCatch
-  :: forall x m e t r a
-  .  (MonadCatch m, Exception e)
-  => (forall s. EscT x s (Either x a) m a)
-  -> (forall q. e -> EscT x q (Either x a) m a)
-  -> EscT x t r m a
-escCatch ma handler =
-  (lift $ catch (evalEscT ma) (evalEscT . handler)) >>= eitherEscape
-
-escLiftMask
-  :: forall x r m t b
-  .  (Monad m)
-  => (forall d. ((forall a. m a -> m a) -> m d) -> m d)
-  -> (forall s
-      .  (forall a q
-          .  EscT x q (Either x a) m a
-          -> EscT x s (Either x b) m a)
-      -> EscT x s (Either x b) m b)
-  -> EscT x t r m b
-escLiftMask mMask ma = do
-  e <- lift $ mMask $ \restore -> do
-    evalEscT $ ma $ \inner -> do
-      e <- lift $ restore $ evalEscT inner
-      eitherEscape e
-  eitherEscape e
-{-# INLINE escLiftMask #-}
-
-escMask
-  :: forall x r m t b
-  .  (MonadMask m)
-  => (forall s
-      .  (forall a q
-          .  EscT x q (Either x a) m a
-          -> EscT x s (Either x b) m a)
-      -> EscT x s (Either x b) m b)
-  -> EscT x t r m b
-escMask = escLiftMask mask
-{-# INLINE escMask #-}
-
-escUninterruptibleMask
-  :: forall x r m t b
-  .  (MonadMask m)
-  => (forall s
-      .  (forall a q
-          .  EscT x q (Either x a) m a
-          -> EscT x s (Either x b) m a)
-      -> EscT x s (Either x b) m b)
-  -> EscT x t r m b
-escUninterruptibleMask = escLiftMask uninterruptibleMask
-{-# INLINE escUninterruptibleMask #-}

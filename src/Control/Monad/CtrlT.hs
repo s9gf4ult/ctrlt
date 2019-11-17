@@ -1,4 +1,9 @@
-module Control.Monad.CtrlT where
+module Control.Monad.CtrlT
+  ( CtrlT(peelCtrlT)
+  , evalCtrlT
+  , runCtrlT
+  , ctrlForallCC
+  ) where
 
 import           Control.Monad.Base
 import           Control.Monad.Catch
@@ -33,24 +38,6 @@ evalCtrlT = runCtrlT return
 
 runCtrlT :: (Monad m) => (a -> m r) -> CtrlT s r m a -> m r
 runCtrlT ret (CtrlT cont) = runContT cont ret
-
-ctrlCatch
-  :: forall m e t r a
-  .  (MonadCatch m, Exception e)
-  => (forall s. CtrlT s (Identity a) m a)
-  -> (forall q. e -> CtrlT q (Identity a) m a)
-  -> CtrlT t r m a
-ctrlCatch ma handler = lift
-  $ fmap runIdentity $ catch (runCtrlT (return . Identity) ma) (runCtrlT (return . Identity) . handler)
-
-ctrlLiftMask
-  :: forall r m t b
-  .  (Monad m)
-  => (forall d. ((forall a. m a -> m a) -> m d) -> m d)
-  -> (forall s. (forall a q . CtrlT q (Identity a) m a -> CtrlT s (Identity b) m a) -> CtrlT s (Identity b) m b)
-  -> CtrlT t r m b
-ctrlLiftMask mMask ma = lift $ fmap runIdentity $ mMask $ \restore ->
-  runCtrlT (return . Identity) (ma $ lift . fmap runIdentity . restore . runCtrlT (return . Identity))
 
 forallCC
   :: ((forall b. a -> ContT r m b) -> ContT r m a)
