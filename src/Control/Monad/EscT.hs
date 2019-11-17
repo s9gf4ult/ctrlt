@@ -61,6 +61,10 @@ instance MonadCont (EscT e s r m) where
     peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
   {-# INLINE callCC #-}
 
+instance (MonadThrow m) => MonadThrow (EscT e s r m) where
+  throwM e = lift $ throwM e
+  {-# INLINE throwM #-}
+
 instance (Monad m) => Phoenix (EscT e) m where
   type Dust (EscT e) a = Either e a
   burnWith ma = reborn $ ma evalEscT

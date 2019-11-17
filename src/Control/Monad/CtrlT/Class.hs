@@ -1,6 +1,7 @@
 module Control.Monad.CtrlT.Class where
 
 import           Control.Monad.Catch
+import           Control.Monad.Cont
 
 class Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) where
   type Dust c a :: *
@@ -8,6 +9,12 @@ class Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) where
     :: ((forall s b. c s (Dust c b) m b -> m (Dust c b)) -> m (Dust c a))
     -> c t r m a
   reborn  :: m (Dust c a) -> c s r m a
+
+type MonadThrowC c m = forall s r. MonadThrow (c s r m)
+
+type MonadContC c m = forall s r. MonadCont (c s r m)
+
+type Eval c m a = forall s. c s (Dust c a) m a -> m a
 
 indexedCatch
     :: forall e c t r m a
@@ -18,6 +25,15 @@ indexedCatch
 indexedCatch ma handler = burnWith $ \flame -> do
   catch (flame ma) (flame . handler)
 {-# INLINE indexedCatch #-}
+
+indexedCatchAll
+    :: forall c t r m a
+    .  (Phoenix c m, MonadCatch m)
+    => (forall s. c s (Dust c a) m a)
+    -> (forall q. SomeException -> c q (Dust c a) m a)
+    -> c t r m a
+indexedCatchAll = indexedCatch
+{-# INLINE indexedCatchAll #-}
 
 indexedMask
   :: forall c t r m b

@@ -1,20 +1,26 @@
 module Control.Monad.SpaceT where
 
+import           Control.Monad.Catch
+import           Control.Monad.Cont
 import           Control.Monad.CtrlT.Class
 import           Control.Monad.Trans.Class
 
-newtype SpaceT t (d :: *) (s :: k) (r :: *) (m :: * -> *) (a :: *) = SpaceT
+newtype SpaceT (d :: *) t (s :: k) (r :: *) (m :: * -> *) (a :: *) = SpaceT
   { peelSpaceT :: d -> t s r m a
   } deriving Functor
 
-instance (Applicative (t s r m)) => Applicative (SpaceT t d s r m) where
+evalSpaceT :: d -> SpaceT d t s r m a -> t s r m a
+evalSpaceT d ma = peelSpaceT ma d
+{-# INLINE evalSpaceT #-}
+
+instance (Applicative (t s r m)) => Applicative (SpaceT d t s r m) where
   pure a = SpaceT $ \_d -> pure a
   {-# INLINE pure #-}
   (SpaceT a) <*> (SpaceT b) = SpaceT $ \d ->
     a d <*> b d
   {-# INLINE (<*>) #-}
 
-instance (Monad (t s r m)) => Monad (SpaceT t d s r m) where
+instance (Monad (t s r m)) => Monad (SpaceT d t s r m) where
   return = pure
   {-# INLINE return #-}
   (SpaceT a) >>= f = SpaceT $ \d -> do
@@ -22,12 +28,21 @@ instance (Monad (t s r m)) => Monad (SpaceT t d s r m) where
     peelSpaceT (f x) d
   {-# INLINE (>>=) #-}
 
-instance (MonadTrans (t s r)) => MonadTrans (SpaceT t d s r) where
+instance (MonadTrans (t s r)) => MonadTrans (SpaceT d t s r) where
   lift ma = SpaceT $ \_d -> lift ma
   {-# INLINE lift #-}
 
-instance (Phoenix t m) => Phoenix (SpaceT t d) m where
-  type Dust (SpaceT t d) a = Dust t a
+instance (MonadCont (t s r m)) => MonadCont (SpaceT d t s r m) where
+  callCC f = SpaceT $ \d -> callCC $ \cc ->
+    peelSpaceT (f $ \a -> SpaceT $ \_ -> cc a) d
+
+instance (MonadThrow m, MonadTrans (t s r), Monad (t s r m))
+  => MonadThrow (SpaceT d t s r m) where
+  throwM e = lift $ throwM e
+  {-# INLINE throwM #-}
+
+instance (Phoenix t m) => Phoenix (SpaceT d t) m where
+  type Dust (SpaceT d t) a = Dust t a
   burnWith ma = SpaceT $ \d -> burnWith $ \flame ->
     ma (\spaceT -> flame $ peelSpaceT spaceT d)
   reborn md = SpaceT $ \_d -> reborn md
