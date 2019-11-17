@@ -31,13 +31,17 @@ instance (MonadThrow m) => MonadThrow (CtrlT s r m) where
 instance (Monad m) => Phoenix CtrlT m where
   type Dust CtrlT a = a
   burnWith ma = lift $ ma evalCtrlT
+  {-# INLINE burnWith #-}
   reborn = lift
+  {-# INLINE reborn #-}
 
 evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
 evalCtrlT = runCtrlT return
+{-# INLINE evalCtrlT #-}
 
 runCtrlT :: (Monad m) => (a -> m r) -> CtrlT s r m a -> m r
 runCtrlT ret (CtrlT cont) = runContT cont ret
+{-# INLINE runCtrlT #-}
 
 forallCC
   :: ((forall b. a -> ContT r m b) -> ContT r m a)
