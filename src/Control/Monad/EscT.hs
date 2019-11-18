@@ -1,7 +1,6 @@
 module Control.Monad.EscT
   (EscT(peelEscT)
   , evalEscT
-  , runEscT
   , escape
   , eitherEscape
   , mapEscape
@@ -14,44 +13,44 @@ import           Control.Monad.CtrlT.Class
 import           Control.Monad.Except
 import           Control.Monad.Reader
 
-newtype EscT (e :: *) (s :: k) (r :: *) (m :: * -> *) (a :: *) = EscT
-  { peelEscT :: (forall x. e -> CtrlT s r m x) -> CtrlT s r m a
+newtype EscT (e :: *) t (s :: k) (r :: *) (m :: * -> *) (a :: *) = EscT
+  { peelEscT :: (forall x. e -> t s r m x) -> t s r m a
   }
 
-runEscT :: EscT e s r m a -> CtrlT s r m (Either e a)
-runEscT (EscT ema) = ctrlForallCC $ \ (esc :: forall x. Either e a -> CtrlT s r m x) -> do
+evalEscT :: (ForallCC t, Functor (t s r m)) => EscT e t s r m a -> t s r m (Either e a)
+evalEscT (EscT ema) = forallCC $ \ (esc :: forall x. Either e a -> t s r m x) -> do
   Right <$> ema (esc . Left)
 
-evalEscT :: Monad m => EscT e s (Either e a) m a -> m (Either e a)
-evalEscT ma = evalCtrlT $ runEscT ma
-{-# INLINE evalEscT #-}
-
-escape :: e -> EscT e s r m a
+escape :: e -> EscT e t s r m a
 escape e = EscT $ \esc -> esc e
 
-eitherEscape :: Either e a -> EscT e s r m a
+eitherEscape :: (Applicative (t s r m)) => Either e a -> EscT e t s r m a
 eitherEscape = \case
-  Left e -> escape e
-  Right a -> return a
+  Left e  -> escape e
+  Right a -> pure a
 
-mapEscape :: (a -> b) -> EscT a s r m x -> EscT b s r m x
+mapEscape
+  :: (Monad (t s r m), ForallCC t)
+  => (a -> b)
+  -> EscT a t s r m x
+  -> EscT b t s r m x
 mapEscape f ma = EscT $ \esc -> do
-  runEscT ma >>= \case
+  evalEscT ma >>= \case
     Right x -> return x
     Left a  -> esc (f a)
 
-instance Functor (EscT e s r m) where
+instance (Functor (t s r m)) => Functor (EscT e t s r m) where
   fmap f (EscT a) = EscT $ \esc -> fmap f (a esc)
   {-# INLINE fmap #-}
 
-instance Applicative (EscT e s r m) where
+instance (Applicative (t s r m)) => Applicative (EscT e t s r m) where
   pure a = EscT $ \_esc -> pure a
   {-# INLINE pure #-}
   (EscT a) <*> (EscT b) = EscT $ \esc ->
     a esc <*> b esc
   {-# INLINE (<*>) #-}
 
-instance Monad (EscT e s r m) where
+instance (Monad (t s r m)) => Monad (EscT e t s r m) where
   return = pure
   {-# INLINE return #-}
   (EscT ma) >>= f = EscT $ \esc -> do
@@ -59,30 +58,41 @@ instance Monad (EscT e s r m) where
     peelEscT (f a) esc
   {-# INLINE (>>=) #-}
 
-instance MonadTrans (EscT e s r) where
+instance (MonadTrans (t s r)) => MonadTrans (EscT e t s r) where
   lift ma = EscT $ \_esc -> lift ma
   {-# INLINE lift #-}
 
-instance MonadCont (EscT e s r m) where
+instance (MonadCont (t s r m)) => MonadCont (EscT e t s r m) where
   callCC f = EscT $ \esc -> callCC $ \cc ->
     peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
   {-# INLINE callCC #-}
 
-instance (MonadThrow m) => MonadThrow (EscT e s r m) where
+instance (ForallCC t) => ForallCC (EscT e t) where
+  forallCC inner = EscT $ \esc -> forallCC $ \fcc ->
+    peelEscT (inner $ \a -> EscT $ \_ -> fcc a) esc
+
+instance (MonadThrow m, Monad (t s r m), MonadTrans (t s r))
+  => MonadThrow (EscT e t s r m) where
   throwM e = lift $ throwM e
   {-# INLINE throwM #-}
 
-instance (Monad m) => Phoenix (EscT e) m where
-  type Dust (EscT e) a = Either e a
-  burnWith ma = reborn $ ma evalEscT
-  reborn me = lift me >>= eitherEscape
+instance (Monad m, Phoenix t m, ForallCC t, forall s r. Monad (t s r m))
+  => Phoenix (EscT e t) m where
+  type Dust (EscT e t) a = Dust t (Either e a)
+  burnWith ma = EscT $ \esc -> do
+    res <- burnWith $ \flame ->
+      ma (\escT -> flame $ evalEscT escT)
+    either esc return res
+  reborn me = EscT $ \esc ->
+    reborn me >>= either esc return
 
-instance MonadError e (EscT e s r m) where
+instance (Monad (t s r m), ForallCC t)
+  => MonadError e (EscT e t s r m) where
   throwError = escape
   catchError ma handler = EscT $ \esc -> do
-    runEscT ma >>= \case
+    evalEscT ma >>= \case
       Right a -> return a
-      Left e -> do
-        runEscT (handler e) >>= \case
+      Left e  -> do
+        evalEscT (handler e) >>= \case
           Right a -> return a
           Left  e -> esc e

@@ -2,7 +2,6 @@ module Control.Monad.CtrlT
   ( CtrlT(peelCtrlT)
   , evalCtrlT
   , runCtrlT
-  , ctrlForallCC
   ) where
 
 import           Control.Monad.Base
@@ -35,6 +34,15 @@ instance (Monad m) => Phoenix CtrlT m where
   reborn = lift
   {-# INLINE reborn #-}
 
+instance ForallCC CtrlT where
+  forallCC inner = CtrlT $ fcc $ \esc ->
+    peelCtrlT (inner $ CtrlT . esc)
+    where
+      fcc
+        :: ((forall b. a -> ContT r m b) -> ContT r m a)
+        -> ContT r m a
+      fcc f = ContT $ \c -> runContT (f (\ x -> ContT $ \ _ -> c x)) c
+
 evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
 evalCtrlT = runCtrlT return
 {-# INLINE evalCtrlT #-}
@@ -42,16 +50,3 @@ evalCtrlT = runCtrlT return
 runCtrlT :: (Monad m) => (a -> m r) -> CtrlT s r m a -> m r
 runCtrlT ret (CtrlT cont) = runContT cont ret
 {-# INLINE runCtrlT #-}
-
-forallCC
-  :: ((forall b. a -> ContT r m b) -> ContT r m a)
-  -> ContT r m a
-forallCC f = ContT $ \ c -> runContT (f (\ x -> ContT $ \ _ -> c x)) c
-{-# INLINE forallCC #-}
-
-ctrlForallCC
-  :: ((forall b. a -> CtrlT s r m b) -> CtrlT s r m a)
-  -> CtrlT s r m a
-ctrlForallCC inner = CtrlT $ forallCC $ \esc ->
-  peelCtrlT (inner $ CtrlT . esc)
-{-# INLINE ctrlForallCC #-}

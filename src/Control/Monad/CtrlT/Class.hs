@@ -10,6 +10,11 @@ class Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) where
     -> c t r m a
   reborn  :: m (Dust c a) -> c s r m a
 
+class ForallCC (c :: k -> * -> (* -> *) -> * -> *) where
+  forallCC
+    :: ((forall b. a -> c s r m b) -> c s r m a)
+    -> c s r m a
+
 type MonadThrowC c m = forall s r. MonadThrow (c s r m)
 
 type MonadContC c m = forall s r. MonadCont (c s r m)
