@@ -6,6 +6,7 @@ module Control.Monad.SpaceT
 import           Control.Monad.Catch
 import           Control.Monad.Cont
 import           Control.Monad.CtrlT.Class
+import           Control.Monad.Except
 import           Control.Monad.Trans.Class
 
 newtype SpaceT (d :: *) t (s :: k) (r :: *) (m :: * -> *) (a :: *) = SpaceT
@@ -49,3 +50,15 @@ instance (Phoenix t m) => Phoenix (SpaceT d t) m where
   burnWith ma = SpaceT $ \d -> burnWith $ \flame ->
     ma (\spaceT -> flame $ peelSpaceT spaceT d)
   reborn md = SpaceT $ \_d -> reborn md
+
+instance (MonadContA t) => MonadContA (SpaceT d t) where
+  callCCA inner = SpaceT $ \d -> callCCA $ \fcc ->
+    peelSpaceT (inner $ \a -> SpaceT $ \_ -> fcc a) d
+  {-# INLINE callCCA #-}
+
+instance (MonadError e (t s r m)) => MonadError e (SpaceT d t s r m) where
+  throwError e = SpaceT $ \_ -> throwError e
+  {-# INLINE throwError #-}
+  catchError ma handler = SpaceT $ \d ->
+    catchError (peelSpaceT ma d) (\e -> peelSpaceT (handler e) d)
+  {-# INLINE catchError #-}

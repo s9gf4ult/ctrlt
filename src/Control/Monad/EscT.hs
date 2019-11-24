@@ -1,5 +1,5 @@
 module Control.Monad.EscT
-  (EscT(peelEscT)
+  ( EscT(peelEscT)
   , evalEscT
   , escape
   , eitherEscape
@@ -17,8 +17,8 @@ newtype EscT (e :: *) t (s :: k) (r :: *) (m :: * -> *) (a :: *) = EscT
   { peelEscT :: (forall x. e -> t s r m x) -> t s r m a
   }
 
-evalEscT :: (ForallCC t, Functor (t s r m)) => EscT e t s r m a -> t s r m (Either e a)
-evalEscT (EscT ema) = forallCC $ \ (esc :: forall x. Either e a -> t s r m x) -> do
+evalEscT :: (MonadContA t, Functor (t s r m)) => EscT e t s r m a -> t s r m (Either e a)
+evalEscT (EscT ema) = callCCA $ \ (esc :: forall x. Either e a -> t s r m x) -> do
   Right <$> ema (esc . Left)
 
 escape :: e -> EscT e t s r m a
@@ -30,7 +30,7 @@ eitherEscape = \case
   Right a -> pure a
 
 mapEscape
-  :: (Monad (t s r m), ForallCC t)
+  :: (Monad (t s r m), MonadContA t)
   => (a -> b)
   -> EscT a t s r m x
   -> EscT b t s r m x
@@ -67,16 +67,17 @@ instance (MonadCont (t s r m)) => MonadCont (EscT e t s r m) where
     peelEscT (f $ \a -> EscT $ \_ -> cc a) esc
   {-# INLINE callCC #-}
 
-instance (ForallCC t) => ForallCC (EscT e t) where
-  forallCC inner = EscT $ \esc -> forallCC $ \fcc ->
+instance (MonadContA t) => MonadContA (EscT e t) where
+  callCCA inner = EscT $ \esc -> callCCA $ \fcc ->
     peelEscT (inner $ \a -> EscT $ \_ -> fcc a) esc
+  {-# INLINE callCCA #-}
 
 instance (MonadThrow m, Monad (t s r m), MonadTrans (t s r))
   => MonadThrow (EscT e t s r m) where
   throwM e = lift $ throwM e
   {-# INLINE throwM #-}
 
-instance (Monad m, Phoenix t m, ForallCC t, forall s r. Monad (t s r m))
+instance (Monad m, Phoenix t m, MonadContA t, forall s r. Monad (t s r m))
   => Phoenix (EscT e t) m where
   type Dust (EscT e t) a = Dust t (Either e a)
   burnWith ma = EscT $ \esc -> do
@@ -86,7 +87,7 @@ instance (Monad m, Phoenix t m, ForallCC t, forall s r. Monad (t s r m))
   reborn me = EscT $ \esc ->
     reborn me >>= either esc return
 
-instance (Monad (t s r m), ForallCC t)
+instance (Monad (t s r m), MonadContA t)
   => MonadError e (EscT e t s r m) where
   throwError = escape
   catchError ma handler = EscT $ \esc -> do

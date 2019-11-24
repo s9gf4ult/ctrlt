@@ -26,7 +26,7 @@ test_No_CC = testGroup "CallCC escape not allowed"
         Left (e :: SomeException) -> throw e
         Right (a :: Int)          -> a
   , testCase "EscT" $ do
-      res <- try $ evalEscT $ do
+      res <- try $ evalCtrlT $ evalEscT $ do
         callCC $ \esc -> do
           indexedCatchAll (esc 1 *> return 2) throwM
                      -- Rethrowing type error ^^^
@@ -55,7 +55,7 @@ test_No_Coerce = testGroup "CallCC escape not coercible"
         Left (e :: SomeException) -> throw e
         Right (a :: Int)          -> a
   , testCase "EscT" $ do
-      res <- try $ evalEscT $ do
+      res <- try $ evalCtrlT $ evalEscT $ do
         callCC $ \esc -> do
           indexedCatchAll (coerce (esc 1) *> return 2) throwM
                               -- Rethrowing type error ^^^

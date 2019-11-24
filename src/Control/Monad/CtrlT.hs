@@ -34,8 +34,8 @@ instance (Monad m) => Phoenix CtrlT m where
   reborn = lift
   {-# INLINE reborn #-}
 
-instance ForallCC CtrlT where
-  forallCC inner = CtrlT $ fcc $ \esc ->
+instance MonadContA CtrlT where
+  callCCA inner = CtrlT $ fcc $ \esc ->
     peelCtrlT (inner $ CtrlT . esc)
     where
       fcc
