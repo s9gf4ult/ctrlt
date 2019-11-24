@@ -27,11 +27,10 @@ instance (MonadThrow m) => MonadThrow (CtrlT s r m) where
   throwM = lift . throwM
   {-# INLINE throwM #-}
 
-instance (Monad m) => Phoenix CtrlT m where
-  type Dust CtrlT a = a
-  burnWith ma = lift $ ma evalCtrlT
+instance (Monad m) => Phoenix CtrlT m Identity where
+  burnWith ma = lift $ runIdentity <$> (ma $ runCtrlT $ return . Identity)
   {-# INLINE burnWith #-}
-  reborn = lift
+  reborn mfa = lift $ runIdentity <$> mfa
   {-# INLINE reborn #-}
 
 instance MonadContA CtrlT where
