@@ -10,6 +10,7 @@ import           Control.Monad.Catch
 import           Control.Monad.Cont
 import           Control.Monad.CtrlT
 import           Control.Monad.CtrlT.Class
+import Data.Functor.Compose
 import           Control.Monad.Except
 import           Control.Monad.Reader
 
@@ -17,9 +18,13 @@ newtype EscT (e :: *) t (s :: k) (r :: *) (m :: * -> *) (a :: *) = EscT
   { peelEscT :: (forall x. e -> t s r m x) -> t s r m a
   }
 
-evalEscT :: (MonadContA t, Functor (t s r m)) => EscT e t s r m a -> t s r m (Either e a)
-evalEscT (EscT ema) = callCCA $ \ (esc :: forall x. Either e a -> t s r m x) -> do
-  Right <$> ema (esc . Left)
+evalEscT
+  :: (MonadContA t, Functor (t s r m))
+  => EscT e t s r m a
+  -> t s r m (Either e a)
+evalEscT (EscT ema) = callCCA
+  $ \(esc :: forall x. Either e a -> t s r m x) ->
+      Right <$> ema (esc . Left)
 
 escape :: e -> EscT e t s r m a
 escape e = EscT $ \esc -> esc e
@@ -77,15 +82,14 @@ instance (MonadThrow m, Monad (t s r m), MonadTrans (t s r))
   throwM e = lift $ throwM e
   {-# INLINE throwM #-}
 
-instance (Monad m, Phoenix t m, MonadContA t, forall s r. Monad (t s r m))
-  => Phoenix (EscT e t) m where
-  type Dust (EscT e t) a = Dust t (Either e a)
+instance (Monad m, Phoenix t m f, MonadContA t, forall s r. Monad (t s r m))
+  => Phoenix (EscT e t) m (Compose f (Either e)) where
   burnWith ma = EscT $ \esc -> do
     res <- burnWith $ \flame ->
-      ma (\escT -> flame $ evalEscT escT)
+      fmap getCompose $ ma (\escT -> fmap Compose $ (flame :: t s (f (Either e b)) m (Either e b) -> m (f (Either e b))) $ evalEscT escT)
     either esc return res
-  reborn me = EscT $ \esc ->
-    reborn me >>= either esc return
+  -- reborn me = EscT $ \esc ->
+  --   reborn me >>= either esc return
 
 instance (Monad (t s r m), MonadContA t)
   => MonadError e (EscT e t s r m) where
