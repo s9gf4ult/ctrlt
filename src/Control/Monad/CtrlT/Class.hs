@@ -21,6 +21,9 @@ class MonadContA (c :: k -> * -> (* -> *) -> * -> *) where
     :: ((forall b. a -> c s r m b) -> c s r m a)
     -> c s r m a
 
+class MapResult (c :: k -> * -> (* -> *) -> * -> *) m where
+  mapResult :: (a -> b) -> (b -> a) -> c s a m x -> c s b m x
+
 type MonadThrowC c m = forall s r. MonadThrow (c s r m)
 
 type MonadContC c m = forall s r. MonadCont (c s r m)

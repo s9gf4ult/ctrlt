@@ -82,14 +82,19 @@ instance (MonadThrow m, Monad (t s r m), MonadTrans (t s r))
   throwM e = lift $ throwM e
   {-# INLINE throwM #-}
 
-instance (Monad m, Phoenix t m f, MonadContA t, forall s r. Monad (t s r m))
-  => Phoenix (EscT e t) m (Compose f (Either e)) where
+instance
+  ( Monad m
+  , Phoenix t m f
+  , MonadContA t
+  , MapResult t m
+  , forall s r. Monad (t s r m)
+  ) => Phoenix (EscT e t) m (Compose f (Either e)) where
   burnWith ma = EscT $ \esc -> do
-    res <- burnWith $ \flame ->
-      fmap getCompose $ ma (\escT -> fmap Compose $ (flame :: t s (f (Either e b)) m (Either e b) -> m (f (Either e b))) $ evalEscT escT)
+    res <- burnWith $ \ (flame :: forall s b. t s (f (Either e b)) m (Either e b) -> m (f (Either e b))) ->
+      fmap getCompose $ ma $ \escT -> fmap Compose $ flame $ mapResult getCompose Compose $ evalEscT escT
     either esc return res
-  -- reborn me = EscT $ \esc ->
-  --   reborn me >>= either esc return
+  reborn me = EscT $ \esc ->
+    reborn (getCompose <$> me) >>= either esc return
 
 instance (Monad (t s r m), MonadContA t)
   => MonadError e (EscT e t s r m) where
