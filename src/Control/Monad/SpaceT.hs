@@ -45,8 +45,7 @@ instance (MonadThrow m, MonadTrans (t s r), Monad (t s r m))
   throwM e = lift $ throwM e
   {-# INLINE throwM #-}
 
-instance (Phoenix t m) => Phoenix (SpaceT d t) m where
-  type Dust (SpaceT d t) a = Dust t a
+instance (Phoenix t m f) => Phoenix (SpaceT d t) m f where
   burnWith ma = SpaceT $ \d -> burnWith $ \flame ->
     ma (\spaceT -> flame $ peelSpaceT spaceT d)
   reborn md = SpaceT $ \_d -> reborn md

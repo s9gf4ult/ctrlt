@@ -3,6 +3,8 @@ module Control.Monad.CtrlT.Class where
 import           Control.Monad.Catch
 import           Control.Monad.Cont
 import           Control.Monad.Except
+import           Data.Functor.Compose
+import           Data.Functor.Identity
 
 class (Applicative f, Traversable f)
   => Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) f
@@ -13,8 +15,16 @@ class (Applicative f, Traversable f)
   reborn  :: m (f a) -> c s r m a
 
 -- | Class of functors which may contain error, but not always do
-class ErrorContainer e f | f -> e where
+class ErrorContainer e f where
   splitError :: forall a. f a -> Maybe e
+
+instance ErrorContainer e Identity where
+  splitError _ = Nothing
+
+instance (Traversable f) => ErrorContainer e (Compose f (Either e)) where
+  splitError (Compose fe) = case sequenceA fe of
+    Left e -> Just e
+    _      -> Nothing
 
 class MonadContA (c :: k -> * -> (* -> *) -> * -> *) where
   callCCA
@@ -63,37 +73,37 @@ indexedCatchError ma handler = burnWith $ \flame -> mask $ \unmask -> do
       Just err -> unmask $ flame $ handler $ Err err
       Nothing  -> return fa
 
--- indexedCatchAll
---   :: forall c t r m a
---   .  (Phoenix c m, MonadCatch m)
---   => (forall s. c s (Dust c a) m a)
---   -> (forall q. SomeException -> c q (Dust c a) m a)
---   -> c t r m a
--- indexedCatchAll = indexedCatch
--- {-# INLINE indexedCatchAll #-}
+indexedCatchAll
+  :: forall c t r m a f
+  .  (Phoenix c m f, MonadCatch m)
+  => (forall s. c s (f a) m a)
+  -> (forall q. SomeException -> c q (f a) m a)
+  -> c t r m a
+indexedCatchAll = indexedCatch
+{-# INLINE indexedCatchAll #-}
 
--- indexedMask
---   :: forall c t r m b
---   .  (Phoenix c m, MonadMask m)
---   => (forall s
---       .  (forall a q
---           .  c q (Dust c a) m a
---           -> c s (Dust c b) m a)
---       -> c s (Dust c b) m b)
---   -> c t r m b
--- indexedMask ma = burnWith $ \flame -> mask $ \restore ->
---   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
--- {-# INLINE indexedMask #-}
+indexedMask
+  :: forall c t r m b f
+  .  (Phoenix c m f, MonadMask m)
+  => (forall s
+      .  (forall a q
+          .  c q (f a) m a
+          -> c s (f b) m a)
+      -> c s (f b) m b)
+  -> c t r m b
+indexedMask ma = burnWith $ \flame -> mask $ \restore ->
+  flame (ma $ \restoring -> reborn $ restore $ flame restoring)
+{-# INLINE indexedMask #-}
 
--- indexedUninterruptibleMask
---   :: forall c t r m b
---   .  (Phoenix c m, MonadMask m)
---   => (forall s
---       .  (forall a q
---           .  c q (Dust c a) m a
---           -> c s (Dust c b) m a)
---       -> c s (Dust c b) m b)
---   -> c t r m b
--- indexedUninterruptibleMask ma = burnWith $ \flame -> uninterruptibleMask $ \restore ->
---   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
--- {-# INLINE indexedUninterruptibleMask #-}
+indexedUninterruptibleMask
+  :: forall c t r m b f
+  .  (Phoenix c m f, MonadMask m)
+  => (forall s
+      .  (forall a q
+          .  c q (f a) m a
+          -> c s (f b) m a)
+      -> c s (f b) m b)
+  -> c t r m b
+indexedUninterruptibleMask ma = burnWith $ \flame -> uninterruptibleMask $ \restore ->
+  flame (ma $ \restoring -> reborn $ restore $ flame restoring)
+{-# INLINE indexedUninterruptibleMask #-}
