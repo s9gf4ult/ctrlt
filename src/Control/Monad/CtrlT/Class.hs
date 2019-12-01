@@ -95,33 +95,31 @@ indexedUninterruptibleMask ma = burnWith $ \flame -> uninterruptibleMask $ \rest
   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
 {-# INLINE indexedUninterruptibleMask #-}
 
--- generalBracket
---   :: forall c s t r m f x y z er ex
---   .  ( Exception ex , Phoenix c m f, ErrorContainer er f, MonadMask m )
---   => (forall o. c o (f x) m x)
---   -- ^ Acquire resource
---   -> (forall q. Either (CatchReason er ex) (x, y) -> c q (f z) m z)
---   -- ^ Free resource and/or do some cleanup
---   -> (forall p. x -> c p (f y) m y)
---   -- ^ Intermediate action
---   -> c s r m (y, z)
--- generalBracket acquire release action = burnWith $ \flame -> mask $ \restore -> do
---   try (restore $ flame acquire) >>= \case
---     Left ex -> restore $ flame $ release $ Left $ Exc ex
-  --   Right fx -> case splitError fx of
-  --     Just err -> restore $ flame $ release $ Left $ Err err
-  --     Nothing -> do
-  --       yres <- try $ restore $ flame $ do
-  --         x <- reborn $ pure fx
-  --         action x
-  --       case yres of
-  --         Left ex -> restore $ flame $ release $ Left $ Exc ex
-  --         Right fy -> case splitError fy of
-  --           Just err -> restore $ flame $ release $ Left $ Err err
-  --           Nothing  -> do
-  --             fz <- restore $ flame $ do
-  --               x <- reborn $ pure fx
-  --               y <- reborn $ pure fy
-  --               release $ Right (x, y)
-  --             _ fz
-              -- flame $ (,) <$> (reborn $ pure fy) <*> (reborn $ pure fz)
+generalBracket
+  :: forall c s t r m f x y z er ex
+  .  ( Exception ex , Phoenix c m f, ErrorContainer er f
+     , MonadMask m, MonadErrorC er c m )
+  => (forall o r. c o r m x)
+  -- ^ Acquire resource
+  -> (forall q r. Either (CatchReason er ex) (x, y) -> c q r m z)
+  -- ^ Free resource and/or do some cleanup
+  -> (forall p r. x -> c p r m y)
+  -- ^ Intermediate action
+  -> c s r m (y, z)
+generalBracket acquire release action = burnWith $ \flame -> mask $ \restore -> do
+  res <- try $ restore $ flame $ do
+    x <- acquire
+    y <- action x
+    return (x, y)
+  case res of
+    Left ex -> do
+      void $ restore $ flame $ release $ Left $ Exc ex
+      throwM ex
+    Right fx -> case splitError fx of
+      Just err -> restore $ flame $ do
+        void $ release $ Left $ Err err
+        throwError err
+      Nothing -> restore $ flame $ do
+        (x, y) <- reborn $ pure fx
+        z <- release $ Right (x, y)
+        return (y, z)
