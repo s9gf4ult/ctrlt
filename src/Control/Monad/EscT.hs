@@ -90,8 +90,8 @@ instance
   , forall s r. Monad (t s r m)
   ) => Phoenix (EscT e t) m (Compose f (Either e)) where
   burnWith ma = EscT $ \esc -> do
-    res <- burnWith $ \ (flame :: forall s b. t s (f (Either e b)) m (Either e b) -> m (f (Either e b))) ->
-      fmap getCompose $ ma $ \escT -> fmap Compose $ flame $ mapResult getCompose Compose $ evalEscT escT
+    res <- burnWith $ \flame ->
+      fmap getCompose $ ma $ \escT -> fmap Compose $ flame $ evalEscT escT
     either esc return res
   reborn me = EscT $ \esc ->
     reborn (getCompose <$> me) >>= either esc return

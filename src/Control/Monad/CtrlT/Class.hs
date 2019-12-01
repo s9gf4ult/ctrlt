@@ -10,9 +10,10 @@ class (Applicative f, Traversable f)
   => Phoenix (c :: k -> * -> (* -> *) -> * -> *) (m :: * -> *) f
   |  c -> f where
   burnWith
-    :: ((forall s b. c s (f b) m b -> m (f b)) -> m (f a))
+    :: forall t r a
+    .  ((forall b. (forall s i. c s i m b) -> m (f b)) -> m (f a))
     -> c t r m a
-  reborn  :: m (f a) -> c s r m a
+  reborn  :: forall s r a. m (f a) -> c s r m a
 
 -- | Class of functors which may contain error, but not always do
 class ErrorContainer e f where
@@ -42,30 +43,20 @@ type MonadErrorC e c m = forall s r. MonadError e (c s r m)
 
 type Eval c m f a = forall s. c s (f a) m a -> m a
 
-indexedCatch
-    :: forall e c t r m a f
-    .  (Exception e, Phoenix c m f, MonadCatch m)
-    => (forall s. c s (f a) m a)
-    -> (forall q. e -> c q (f a) m a)
-    -> c t r m a
-indexedCatch ma handler = burnWith $ \flame -> do
-  catch (flame ma) (flame . handler)
-{-# INLINE indexedCatch #-}
-
-data ErrorReason er ex
+data CatchReason er ex
   = Err er
   | Exc ex
 
 tryCatch :: (MonadError e m) => m a -> m (Either e a)
 tryCatch ma = catchError (Right <$> ma) (return . Left)
 
-indexedCatchError
+indexedCatch
   :: forall c t r m a e x f
   .  (Phoenix c m f, MonadMask m, ErrorContainer e f, Exception x)
-  => (forall s. c s (f a) m a)
-  -> (forall q. ErrorReason e x -> c q (f a) m a)
+  => (forall s r. c s r m a)
+  -> (forall q r. CatchReason e x -> c q r m a)
   -> c t r m a
-indexedCatchError ma handler = burnWith $ \flame -> mask $ \unmask -> do
+indexedCatch ma handler = burnWith $ \flame -> mask $ \unmask -> do
   res <- try $ unmask $ flame ma
   case res of
     Left exc -> unmask $ flame $ handler $ Exc exc
@@ -74,10 +65,10 @@ indexedCatchError ma handler = burnWith $ \flame -> mask $ \unmask -> do
       Nothing  -> return fa
 
 indexedCatchAll
-  :: forall c t r m a f
-  .  (Phoenix c m f, MonadCatch m)
-  => (forall s. c s (f a) m a)
-  -> (forall q. SomeException -> c q (f a) m a)
+  :: forall c t r m a e f
+  .  (Phoenix c m f, MonadMask m, ErrorContainer e f)
+  => (forall s r. c s r m a)
+  -> (forall q r. CatchReason e SomeException -> c q r m a)
   -> c t r m a
 indexedCatchAll = indexedCatch
 {-# INLINE indexedCatchAll #-}
@@ -85,11 +76,9 @@ indexedCatchAll = indexedCatch
 indexedMask
   :: forall c t r m b f
   .  (Phoenix c m f, MonadMask m)
-  => (forall s
-      .  (forall a q
-          .  c q (f a) m a
-          -> c s (f b) m a)
-      -> c s (f b) m b)
+  => (forall s i
+      .  (forall a. (forall q j. c q j m a) -> c s i m a)
+      -> c s i m b)
   -> c t r m b
 indexedMask ma = burnWith $ \flame -> mask $ \restore ->
   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
@@ -98,12 +87,41 @@ indexedMask ma = burnWith $ \flame -> mask $ \restore ->
 indexedUninterruptibleMask
   :: forall c t r m b f
   .  (Phoenix c m f, MonadMask m)
-  => (forall s
-      .  (forall a q
-          .  c q (f a) m a
-          -> c s (f b) m a)
-      -> c s (f b) m b)
+  => (forall s i
+      .  (forall a. (forall q j. c q j m a) -> c s i m a)
+      -> c s i m b)
   -> c t r m b
 indexedUninterruptibleMask ma = burnWith $ \flame -> uninterruptibleMask $ \restore ->
   flame (ma $ \restoring -> reborn $ restore $ flame restoring)
 {-# INLINE indexedUninterruptibleMask #-}
+
+-- generalBracket
+--   :: forall c s t r m f x y z er ex
+--   .  ( Exception ex , Phoenix c m f, ErrorContainer er f, MonadMask m )
+--   => (forall o. c o (f x) m x)
+--   -- ^ Acquire resource
+--   -> (forall q. Either (CatchReason er ex) (x, y) -> c q (f z) m z)
+--   -- ^ Free resource and/or do some cleanup
+--   -> (forall p. x -> c p (f y) m y)
+--   -- ^ Intermediate action
+--   -> c s r m (y, z)
+-- generalBracket acquire release action = burnWith $ \flame -> mask $ \restore -> do
+--   try (restore $ flame acquire) >>= \case
+--     Left ex -> restore $ flame $ release $ Left $ Exc ex
+  --   Right fx -> case splitError fx of
+  --     Just err -> restore $ flame $ release $ Left $ Err err
+  --     Nothing -> do
+  --       yres <- try $ restore $ flame $ do
+  --         x <- reborn $ pure fx
+  --         action x
+  --       case yres of
+  --         Left ex -> restore $ flame $ release $ Left $ Exc ex
+  --         Right fy -> case splitError fy of
+  --           Just err -> restore $ flame $ release $ Left $ Err err
+  --           Nothing  -> do
+  --             fz <- restore $ flame $ do
+  --               x <- reborn $ pure fx
+  --               y <- reborn $ pure fy
+  --               release $ Right (x, y)
+  --             _ fz
+              -- flame $ (,) <$> (reborn $ pure fy) <*> (reborn $ pure fz)

@@ -46,10 +46,10 @@ instance (Functor m) => MapResult CtrlT m  where
   mapResult f b (CtrlT (ContT xmaRe)) = CtrlT $ ContT $ \xmb ->
     fmap f $ xmaRe $ \x -> fmap b $ xmb x
 
-evalCtrlT :: (Monad m) => CtrlT s a m a -> m a
+evalCtrlT :: (Monad m) => (forall s. CtrlT s a m a) -> m a
 evalCtrlT = runCtrlT return
 {-# INLINE evalCtrlT #-}
 
-runCtrlT :: (Monad m) => (a -> m r) -> CtrlT s r m a -> m r
+runCtrlT :: (Monad m) => (a -> m r) -> (forall s. CtrlT s r m a) -> m r
 runCtrlT ret (CtrlT cont) = runContT cont ret
 {-# INLINE runCtrlT #-}
